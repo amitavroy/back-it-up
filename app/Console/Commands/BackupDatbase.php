@@ -2,6 +2,7 @@
 
 namespace App\Console\Commands;
 
+use App\Records;
 use Carbon\Carbon;
 use Illuminate\Console\Command;
 use Illuminate\Http\File;
@@ -38,6 +39,7 @@ class BackupDatbase extends Command
     public function __construct()
     {
         parent::__construct();
+
         $this->fileName = uniqid();
     }
 
@@ -57,6 +59,10 @@ class BackupDatbase extends Command
         $this->uploadToS3();
 
         $this->removeTheZipFile();
+
+        $this->makeDBEntry();
+
+        \Log::info("Backup done. Sql file size {$this->sqlSize} and after zip {$this->gzipSize} uploaded at url {$this->s3Url}");
     }
 
     private function getFileSize(File $file)
@@ -91,6 +97,9 @@ class BackupDatbase extends Command
             ->setPassword($password)
             ->dumpToFile($fileName  . '.sql');
 
+        $file = new File("{$fileName}.sql");
+        $this->sqlSize = $this->getFileSize($file);
+
         $dumpTimeInSec = microtime(TRUE) - $dumpStart;
         \Log::info('End dump took ' . $dumpTimeInSec . ' seconds');
     }
@@ -108,6 +117,7 @@ class BackupDatbase extends Command
         $compressTimeInSec = microtime(TRUE) - $compressTime;
         $file = new File("{$fileName}.tar.gz");
         $fileSize = $this->getFileSize($file);
+        $this->gzipSize = $fileSize;
         \Log::info("End compression took {$compressTimeInSec} seconds to compress file of {$fileSize}");
     }
 
@@ -124,7 +134,7 @@ class BackupDatbase extends Command
         $fileName = $this->fileName;
 
         // upload file to S3
-        $filePath = Carbon::now()->format('Y/F/');
+        $filePath = Carbon::now()->format('Y/F');
         $uploadTime = microtime(TRUE);
         $this->s3Url = "db-backups/{$filePath}/{$fileName}.tar.gz";
         Storage::disk('s3')->putFileAs("db-backups/{$filePath}", new File("{$fileName}.tar.gz"), "{$fileName}.tar.gz");
@@ -138,5 +148,16 @@ class BackupDatbase extends Command
         // remove the compressed file
         $process = new Process("rm {$fileName}.tar.gz");
         $process->run();
+    }
+
+    private function makeDBEntry()
+    {
+        $bucket = env('AWS_BUCKET');
+
+        Records::create([
+            'sql_file_size' => $this->sqlSize,
+            'gzip_file_size' => $this->gzipSize,
+            'url' => "https://s3.amazonaws.com/{$bucket}/$this->s3Url",
+        ]);
     }
 }
