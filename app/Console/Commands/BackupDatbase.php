@@ -2,10 +2,13 @@
 
 namespace App\Console\Commands;
 
+use App\Mail\DBBackupCompleted;
 use App\Records;
+use App\Services\BackupData;
 use Carbon\Carbon;
 use Illuminate\Console\Command;
 use Illuminate\Http\File;
+use Illuminate\Support\Facades\Mail;
 use Illuminate\Support\Facades\Storage;
 use Spatie\DbDumper\Databases\MySql;
 use Symfony\Component\Process\Process;
@@ -29,7 +32,9 @@ class BackupDatbase extends Command
     protected $fileName;
     protected $s3Url;
     protected $sqlSize;
+    protected $sqlTime;
     protected $gzipSize;
+    protected $compressTime;
 
     /**
      * Create a new command instance.
@@ -51,18 +56,13 @@ class BackupDatbase extends Command
     public function handle()
     {
         $this->takeMySQLDump();
-
         $this->compressSqlFile();
-
         $this->removeTheSqlFile();
-
         $this->uploadToS3();
-
         $this->removeTheZipFile();
-
         $this->makeDBEntry();
-
-        \Log::info("Backup done. Sql file size {$this->sqlSize} and after zip {$this->gzipSize} uploaded at url {$this->s3Url}");
+        $data = $this->getMailData();
+        Mail::to('amitavroy@gmail.com')->send(new DBBackupCompleted($data));
     }
 
     private function getFileSize(File $file)
@@ -84,9 +84,8 @@ class BackupDatbase extends Command
     private function takeMySQLDump()
     {
         $dumpStart = microtime(TRUE);
-        \Log::info('Start dump');
 
-        $databaseName = 'trualta';
+        $databaseName = 'testdb';
         $userName = 'root';
         $password = '';
         $fileName = $this->fileName;
@@ -100,25 +99,23 @@ class BackupDatbase extends Command
         $file = new File("{$fileName}.sql");
         $this->sqlSize = $this->getFileSize($file);
 
-        $dumpTimeInSec = microtime(TRUE) - $dumpStart;
-        \Log::info('End dump took ' . $dumpTimeInSec . ' seconds');
+        $this->compressTime = microtime(TRUE) - $dumpStart;
+        \Log::info("Time to sql {$this->compressTime}");
     }
 
     private function compressSqlFile()
     {
         $fileName = $this->fileName;
-        \Log::info('Start compression');
         $compressTime = microtime(TRUE);
 
         // compress the sql file
         $process = new Process("tar -zcf {$fileName}.tar.gz {$fileName}.sql");
         $process->run();
 
-        $compressTimeInSec = microtime(TRUE) - $compressTime;
+        $this->sqlTime = microtime(TRUE) - $compressTime;
         $file = new File("{$fileName}.tar.gz");
         $fileSize = $this->getFileSize($file);
         $this->gzipSize = $fileSize;
-        \Log::info("End compression took {$compressTimeInSec} seconds to compress file of {$fileSize}");
     }
 
     private function removeTheSqlFile()
@@ -139,7 +136,6 @@ class BackupDatbase extends Command
         $this->s3Url = "db-backups/{$filePath}/{$fileName}.tar.gz";
         Storage::disk('s3')->putFileAs("db-backups/{$filePath}", new File("{$fileName}.tar.gz"), "{$fileName}.tar.gz");
         $uploadTimeInSec = microtime(TRUE) - $uploadTime;
-        \Log::info('Upload of file took ' . $uploadTimeInSec . ' seconds');
     }
 
     private function removeTheZipFile()
@@ -158,6 +154,16 @@ class BackupDatbase extends Command
             'sql_file_size' => $this->sqlSize,
             'gzip_file_size' => $this->gzipSize,
             'url' => "https://s3.amazonaws.com/{$bucket}/$this->s3Url",
+            'dump_time' => date('H:i:s', $this->sqlTime),
+            'compress_time' => date('H:i:s', $this->compressTime),
         ]);
+    }
+
+    /**
+     * @return BackupData
+     */
+    private function getMailData()
+    {
+        return new BackupData($this->sqlSize, $this->gzipSize, $this->s3Url, $this->sqlTime, $this->compressTime);
     }
 }

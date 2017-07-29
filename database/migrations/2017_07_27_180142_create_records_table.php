@@ -16,7 +16,9 @@ class CreateRecordsTable extends Migration
         Schema::create('records', function (Blueprint $table) {
             $table->increments('id');
             $table->string('sql_file_size', 50);
+            $table->time('dump_time');
             $table->string('gzip_file_size', 50);
+            $table->time('compress_time');
             $table->string('url');
             $table->timestamps();
         });
