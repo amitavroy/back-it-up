@@ -61,8 +61,10 @@ class BackupDatbase extends Command
         $this->uploadToS3();
         $this->removeTheZipFile();
         $this->makeDBEntry();
-        $data = $this->getMailData();
-        Mail::to('amitavroy@gmail.com')->send(new DBBackupCompleted($data));
+
+        if (config('backitup.send-email')) {
+            $this->sendEmailNotification();
+        }
     }
 
     private function getFileSize(File $file)
@@ -100,7 +102,6 @@ class BackupDatbase extends Command
         $this->sqlSize = $this->getFileSize($file);
 
         $this->compressTime = microtime(TRUE) - $dumpStart;
-        \Log::info("Time to sql {$this->compressTime}");
     }
 
     private function compressSqlFile()
@@ -128,14 +129,13 @@ class BackupDatbase extends Command
 
     private function uploadToS3()
     {
+        $folderName = config('backitup.', 'db-backups');
         $fileName = $this->fileName;
 
         // upload file to S3
         $filePath = Carbon::now()->format('Y/F');
-        $uploadTime = microtime(TRUE);
-        $this->s3Url = "db-backups/{$filePath}/{$fileName}.tar.gz";
+        $this->s3Url = "{$folderName}/{$filePath}/{$fileName}.tar.gz";
         Storage::disk('s3')->putFileAs("db-backups/{$filePath}", new File("{$fileName}.tar.gz"), "{$fileName}.tar.gz");
-        $uploadTimeInSec = microtime(TRUE) - $uploadTime;
     }
 
     private function removeTheZipFile()
@@ -165,5 +165,19 @@ class BackupDatbase extends Command
     private function getMailData()
     {
         return new BackupData($this->sqlSize, $this->gzipSize, $this->s3Url, $this->sqlTime, $this->compressTime);
+    }
+
+    /**
+     *
+     */
+    private function sendEmailNotification()
+    {
+        $toEmail = config('backitup.mail-to');
+        $subjectEmail = config('backitup.mail-subject');
+        $data = $this->getMailData();
+
+        Mail::to($toEmail)
+            ->subject($subjectEmail)
+            ->send(new DBBackupCompleted($data));
     }
 }

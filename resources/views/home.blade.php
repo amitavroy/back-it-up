@@ -3,9 +3,9 @@
 @section('content')
     <div class="container">
         <div class="row">
-            <div class="col-md-8 col-md-offset-2">
+            <div class="col-md-10 col-md-offset-1">
                 <div class="panel panel-default">
-                    <div class="panel-heading">Dashboard</div>
+                    <div class="panel-heading"><h3>List of backups</h3></div>
 
                     <div class="panel-body">
                         A list of the backups taken for the Database and a link to download them.
