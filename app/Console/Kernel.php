@@ -25,7 +25,7 @@ class Kernel extends ConsoleKernel
      */
     protected function schedule(Schedule $schedule)
     {
-        $schedule->command('inspire')->hourly();
+        $schedule->command('inspire')->daily();
 
         $frequency = config('backitup.frequency');
         $schedule->command('database:backup')->$frequency();

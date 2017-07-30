@@ -12,7 +12,7 @@ return [
     | allowed functions which comes with the
     | schedule function
     */
-    'frequency' => 'everyMinute',
+    'frequency' => env('DB_BACKUP_FREQ', 'daily'),
 
     /*
     |--------------------------------------------------------------------------
