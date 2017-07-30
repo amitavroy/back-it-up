@@ -35,6 +35,7 @@ class BackupDatbase extends Command
     protected $sqlTime;
     protected $gzipSize;
     protected $compressTime;
+    protected $record;
 
     /**
      * Create a new command instance.
@@ -150,21 +151,15 @@ class BackupDatbase extends Command
     {
         $bucket = env('AWS_BUCKET');
 
-        Records::create([
+        $record = Records::create([
             'sql_file_size' => $this->sqlSize,
             'gzip_file_size' => $this->gzipSize,
             'url' => "https://s3.amazonaws.com/{$bucket}/$this->s3Url",
             'dump_time' => date('H:i:s', $this->sqlTime),
             'compress_time' => date('H:i:s', $this->compressTime),
         ]);
-    }
 
-    /**
-     * @return BackupData
-     */
-    private function getMailData()
-    {
-        return new BackupData($this->sqlSize, $this->gzipSize, $this->s3Url, $this->sqlTime, $this->compressTime);
+        $this->record = $record;
     }
 
     /**
@@ -173,11 +168,6 @@ class BackupDatbase extends Command
     private function sendEmailNotification()
     {
         $toEmail = config('backitup.mail-to');
-        $subjectEmail = config('backitup.mail-subject');
-        $data = $this->getMailData();
-
-        Mail::to($toEmail)
-            ->subject($subjectEmail)
-            ->send(new DBBackupCompleted($data));
+        Mail::to($toEmail)->send(new DBBackupCompleted($this->record));
     }
 }

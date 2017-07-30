@@ -2,6 +2,7 @@
 
 namespace App\Mail;
 
+use App\Records;
 use App\Services\BackupData;
 use Illuminate\Bus\Queueable;
 use Illuminate\Mail\Mailable;
@@ -14,16 +15,17 @@ class DBBackupCompleted extends Mailable
     /**
      * @var BackupData
      */
-    private $backupData;
+    private $record;
 
     /**
      * Create a new message instance.
      *
-     * @param BackupData $backupData
+     * @param Records $record
+     * @internal param BackupData $backupData
      */
-    public function __construct(BackupData $backupData)
+    public function __construct(Records $record)
     {
-        $this->backupData = $backupData;
+        $this->record = $record;
     }
 
     /**
@@ -33,11 +35,14 @@ class DBBackupCompleted extends Mailable
      */
     public function build()
     {
-        $data = [
-            'sqlFileSize' => $this->backupData->getSqlFileSize(),
-            'gzipFileSize' => $this->backupData->getGzipFileSize(),
-            'url' => $this->backupData->getUrl(),
-        ];
-        return $this->view('mails.db-completed')->with('data', $data);
+        $subjectEmail = config('backitup.mail-subject');
+
+        $lastRecord = Records::where('id', '!=', $this->record->id)
+            ->orderBy('created_at', 'desc')
+            ->first();
+        return $this->view('mails.db-completed')
+            ->subject($subjectEmail)
+            ->with('lastRecord', $lastRecord)
+            ->with('data', $this->record);
     }
 }
