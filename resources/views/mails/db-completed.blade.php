@@ -1,6 +1,6 @@
 Hi,
 
-<p>The database backup has been taken.</p>
+<p>The database backup for <strong>{{config('backitup.database', 'forge')}}</strong> has been taken.</p>
 
 <table border="1" cellpadding="2" cellspacing="2">
     <thead>
@@ -11,7 +11,12 @@ Hi,
     </tr>
     </thead>
     <tr>
-        <td>Count</td>
+        <td><strong>Created</strong></td>
+        <td>{{$data->created_at}}</td>
+        <td>{{$lastRecord->created_at}}</td>
+    </tr>
+    <tr>
+        <td><strong>Count</strong></td>
         <td>{{$data->id}}</td>
         <td>{{$lastRecord->id}}</td>
     </tr>

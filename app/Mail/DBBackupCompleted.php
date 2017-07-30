@@ -40,6 +40,13 @@ class DBBackupCompleted extends Mailable
         $lastRecord = Records::where('id', '!=', $this->record->id)
             ->orderBy('created_at', 'desc')
             ->first();
+
+        // when this is the first record. Backup running for the first time
+        // compare with itself
+        if (!$lastRecord) {
+            $lastRecord = $this->record;
+        }
+
         return $this->view('mails.db-completed')
             ->subject($subjectEmail)
             ->with('lastRecord', $lastRecord)
