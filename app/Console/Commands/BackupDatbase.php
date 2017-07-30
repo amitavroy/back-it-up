@@ -88,9 +88,9 @@ class BackupDatbase extends Command
     {
         $dumpStart = microtime(TRUE);
 
-        $databaseName = 'testdb';
-        $userName = 'root';
-        $password = '';
+        $databaseName = config('backitup.database', 'forge');
+        $userName = env('DB_USERNAME');
+        $password = env('DB_PASSWORD');
         $fileName = $this->fileName;
 
         MySql::create()
